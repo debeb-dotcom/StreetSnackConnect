@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Star, Store } from "lucide-react";
+import { useCart } from "@/hooks/use-cart";
+import { useToast } from "@/hooks/use-toast";
 
 export default function PriceComparison() {
   const [selectedProduct] = useState({
@@ -10,6 +12,8 @@ export default function PriceComparison() {
     unit: "1 kg",
     image: "🍅",
   });
+  const { addToCart } = useCart();
+  const { toast } = useToast();
 
   const priceComparisons = [
     {
@@ -88,7 +92,10 @@ export default function PriceComparison() {
           ))}
         </div>
         
-        <Button className="mt-4 w-full bg-primary text-white hover:bg-primary/90" onClick={() => alert('Added best price item to cart!')}>
+        <Button className="mt-4 w-full bg-primary text-white hover:bg-primary/90" onClick={async () => {
+          await addToCart("1", 1, "supplier1"); // Example: productId "1", quantity 1, supplierId "supplier1"
+          toast({ title: 'Added best price item to cart!' });
+        }}>
           Add to Cart - Best Price ₹{priceComparisons[0].price}
         </Button>
       </CardContent>

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Leaf, Droplets, Flame, Milk, Wheat, Drumstick } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const categoryIcons = {
   "Vegetables": Leaf,
@@ -25,6 +26,7 @@ export default function ProductCategories() {
   const { data: categories, isLoading } = useQuery({
     queryKey: ["/api/categories"],
   });
+  const { toast } = useToast();
 
   if (isLoading) {
     return (
@@ -62,7 +64,7 @@ export default function ProductCategories() {
         
         <CardContent className="pt-6">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {categories?.map((category: any) => {
+            {(Array.isArray(categories) ? categories : []).map((category: any) => {
               const IconComponent = categoryIcons[category.name as keyof typeof categoryIcons] || Leaf;
               const colors = categoryColors[category.name as keyof typeof categoryColors] || categoryColors.Vegetables;
               
@@ -70,6 +72,7 @@ export default function ProductCategories() {
                 <div 
                   key={category.id}
                   className="group cursor-pointer p-4 rounded-lg border border-neutral-200 hover:border-primary hover:shadow-md transition-all"
+                  onClick={() => toast({ title: 'Category browsing', description: 'Category browsing coming soon!' })}
                 >
                   <div className={`w-12 h-12 ${colors.bg} rounded-lg flex items-center justify-center mb-3 ${colors.hover}`}>
                     <IconComponent className={`${colors.icon} h-6 w-6 transition-colors ${colors.hover}`} />

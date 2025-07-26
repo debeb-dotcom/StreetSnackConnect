@@ -7,6 +7,9 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { CartProvider } from "@/hooks/use-cart";
 import Dashboard from "@/pages/dashboard";
 import Login from "@/pages/login";
+import VendorLogin from "@/pages/vendor-login";
+import SupplierLogin from "@/pages/supplier-login";
+import ChooseRole from "@/pages/choose-role";
 import Products from "@/pages/products";
 import Suppliers from "@/pages/suppliers";
 import Orders from "@/pages/orders";
@@ -20,6 +23,9 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/login" component={Login} />
+      <Route path="/vendor-login" component={VendorLogin} />
+      <Route path="/supplier-login" component={SupplierLogin} />
+      <Route path="/choose-role" component={ChooseRole} />
       <Route path="/products" component={Products} />
       <Route path="/suppliers" component={Suppliers} />
       <Route path="/orders" component={Orders} />

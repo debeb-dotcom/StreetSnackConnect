@@ -4,9 +4,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Star, MapPin } from "lucide-react";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 export default function NearbySuppliers() {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const { data: suppliers, isLoading } = useQuery({
     queryKey: ["/api/suppliers", { verified: true, limit: 5 }],
   });
@@ -50,10 +52,11 @@ export default function NearbySuppliers() {
         
         <CardContent className="pt-6">
           <div className="space-y-4">
-            {suppliers?.map((supplier: any) => (
+            {(Array.isArray(suppliers) ? suppliers : []).map((supplier: any) => (
               <div 
                 key={supplier.id}
                 className="flex items-center space-x-3 p-3 border border-neutral-200 rounded-lg hover:bg-neutral-50 cursor-pointer transition-colors"
+                onClick={() => toast({ title: 'Supplier details', description: 'Supplier details coming soon!' })}
               >
                 <div className="w-12 h-12 bg-gradient-to-br from-primary/20 to-primary/40 rounded-lg flex items-center justify-center">
                   <span className="text-primary font-semibold text-sm">
@@ -89,7 +92,7 @@ export default function NearbySuppliers() {
           
           <button 
             className="mt-4 w-full text-primary hover:text-primary/80 text-sm font-medium py-2 transition-colors"
-            onClick={() => setLocation("/suppliers")}
+            onClick={() => toast({ title: 'View All Suppliers', description: 'Already on suppliers page!' })}
           >
             View All Suppliers
           </button>

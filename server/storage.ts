@@ -127,6 +127,102 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
     };
     this.users.set(adminId, admin);
+
+    // Create demo vendor user
+    const vendorId = randomUUID();
+    const vendor: User = {
+      id: vendorId,
+      username: "vendor",
+      email: "vendor@supplylink.com",
+      password: "vendor123",
+      role: "vendor",
+      firstName: "Street",
+      lastName: "Vendor",
+      phone: "+91-8888888888",
+      isVerified: true,
+      createdAt: new Date(),
+    };
+    this.users.set(vendorId, vendor);
+
+    // Create demo supplier user
+    const supplierId = randomUUID();
+    const supplier: User = {
+      id: supplierId,
+      username: "supplier",
+      email: "supplier@supplylink.com",
+      password: "supplier123",
+      role: "supplier",
+      firstName: "Raw",
+      lastName: "Supplier",
+      phone: "+91-7777777777",
+      isVerified: true,
+      createdAt: new Date(),
+    };
+    this.users.set(supplierId, supplier);
+
+    // Create demo supplier profile
+    const supplierProfile: Supplier = {
+      id: randomUUID(),
+      userId: supplierId,
+      businessName: "Fresh Farm Supplies",
+      description: "Premium quality raw materials for street food vendors",
+      address: "123 Market Street, Mumbai, Maharashtra",
+      latitude: "19.0760",
+      longitude: "72.8777",
+      rating: "4.8",
+      totalRatings: 150,
+      isVerified: true,
+      verificationStatus: "approved",
+      createdAt: new Date(),
+    };
+    this.suppliers.set(supplierProfile.id, supplierProfile);
+
+    // Add demo products for the supplier
+    const demoProducts: Product[] = [
+      {
+        id: randomUUID(),
+        supplierId: supplierProfile.id,
+        categoryId: Array.from(this.categories.values())[0]?.id || "",
+        name: "Red Onions",
+        description: "Premium quality red onions from local farms",
+        unit: "kg",
+        pricePerUnit: "35",
+        stockQuantity: 150,
+        minOrderQuantity: 10,
+        imageUrl: "🥔",
+        isActive: true,
+        createdAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        supplierId: supplierProfile.id,
+        categoryId: Array.from(this.categories.values())[1]?.id || "",
+        name: "Sunflower Oil",
+        description: "Refined sunflower oil for cooking",
+        unit: "liter",
+        pricePerUnit: "120",
+        stockQuantity: 45,
+        minOrderQuantity: 5,
+        imageUrl: "🛢️",
+        isActive: true,
+        createdAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        supplierId: supplierProfile.id,
+        categoryId: Array.from(this.categories.values())[2]?.id || "",
+        name: "Garam Masala",
+        description: "Authentic spice blend for Indian cuisine",
+        unit: "kg",
+        pricePerUnit: "250",
+        stockQuantity: 2,
+        minOrderQuantity: 1,
+        imageUrl: "🌶️",
+        isActive: true,
+        createdAt: new Date(),
+      },
+    ];
+    demoProducts.forEach(product => this.products.set(product.id, product));
   }
 
   // User methods
@@ -383,7 +479,7 @@ export class MemStorage implements IStorage {
           };
         });
       
-      const totalAmount = items.reduce((sum, item) => sum + (item.pricePerUnit * item.quantity), 0);
+      const totalAmount = items.reduce((sum, item) => sum + (parseFloat(item.pricePerUnit.toString()) * item.quantity), 0);
       const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
       
       return {
@@ -415,7 +511,7 @@ export class MemStorage implements IStorage {
         };
       });
     
-    const totalAmount = items.reduce((sum, item) => sum + (item.pricePerUnit * item.quantity), 0);
+    const totalAmount = items.reduce((sum, item) => sum + (parseFloat(item.pricePerUnit.toString()) * item.quantity), 0);
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
     
     return {
@@ -466,7 +562,7 @@ export class MemStorage implements IStorage {
         cartId: cart.id,
         productId,
         quantity,
-        pricePerUnit: parseFloat(product.pricePerUnit.toString()),
+        pricePerUnit: product.pricePerUnit,
         createdAt: new Date(),
         updatedAt: new Date(),
       };

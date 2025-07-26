@@ -13,7 +13,7 @@ import MobileNav from "@/components/layout/mobile-nav";
 import { ShoppingCart, Minus, Plus, Trash2, Store, CreditCard, Truck, ArrowLeft } from "lucide-react";
 
 export default function Cart() {
-  const { user, isLoading } = useAuth();
+  const { user, supplier, isLoading } = useAuth();
   const [, setLocation] = useLocation();
   const { carts, totalItemsCount, totalAmount, updateCartItem, removeFromCart, clearCart, isLoading: cartLoading } = useCart();
   const [deliveryAddress, setDeliveryAddress] = useState("");
@@ -24,7 +24,11 @@ export default function Cart() {
     if (!isLoading && !user) {
       setLocation("/login");
     }
-  }, [user, isLoading, setLocation]);
+    // If supplier, redirect to dashboard
+    if (!isLoading && (supplier || user?.role === "supplier")) {
+      setLocation("/supplier-dashboard");
+    }
+  }, [user, supplier, isLoading, setLocation]);
 
   const handleQuantityChange = async (cartId: string, itemId: string, newQuantity: number) => {
     if (newQuantity < 1) return;

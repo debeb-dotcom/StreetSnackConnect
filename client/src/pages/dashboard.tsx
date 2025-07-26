@@ -13,10 +13,12 @@ import PriceComparison from "@/components/dashboard/price-comparison";
 import RecentOrders from "@/components/dashboard/recent-orders";
 import InventoryAlerts from "@/components/inventory/inventory-alerts";
 import { Search, Plus, Filter } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Dashboard() {
   const { user, isLoading } = useAuth();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -81,11 +83,11 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button className="whitespace-nowrap">
+                  <Button className="whitespace-nowrap" onClick={() => setLocation("/products") }>
                     <Plus className="mr-2 h-4 w-4" />
                     New Order
                   </Button>
-                  <Button variant="outline" className="whitespace-nowrap">
+                  <Button variant="outline" className="whitespace-nowrap" onClick={() => toast({ title: 'Filter', description: 'Filter functionality coming soon!' })}>
                     <Filter className="mr-2 h-4 w-4" />
                     Filter
                   </Button>

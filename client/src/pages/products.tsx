@@ -13,6 +13,20 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Header from "@/components/layout/header";
 import MobileNav from "@/components/layout/mobile-nav";
 import { Search, Filter, ShoppingCart, Star, MapPin, AlertTriangle } from "lucide-react";
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { insertProductSchema } from "@shared/schema";
+
+// Extend the schema to require supplier fields for the form, and make all numeric fields numbers
+import { z } from "zod";
+const addProductFormSchema = insertProductSchema.extend({
+  stockQuantity: z.number({ required_error: "Stock quantity is required" }),
+  minOrderQuantity: z.number({ required_error: "Minimum order quantity is required" }),
+  supplierBusinessName: z.string().min(1, "Supplier business name is required"),
+  supplierRating: z.number({ required_error: "Supplier rating is required" }),
+  supplierAddress: z.string().min(1, "Supplier address is required"),
+});
 
 export default function Products() {
   const { user, isLoading } = useAuth();
@@ -23,6 +37,23 @@ export default function Products() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [sortBy, setSortBy] = useState("price");
   const [quantities, setQuantities] = useState<{ [key: string]: number }>({});
+  const [addOpen, setAddOpen] = useState(false);
+  const addForm = useForm({
+    resolver: zodResolver(addProductFormSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      unit: "kg",
+      pricePerUnit: undefined,
+      stockQuantity: undefined,
+      minOrderQuantity: 1,
+      categoryId: "",
+      imageUrl: "",
+      supplierBusinessName: "",
+      supplierRating: undefined,
+      supplierAddress: "",
+    },
+  });
 
   const handleQuantityChange = (productId: string, quantity: number) => {
     setQuantities(prev => ({ ...prev, [productId]: quantity }));
@@ -32,7 +63,7 @@ export default function Products() {
     const quantity = quantities[product.id] || product.minOrderQuantity || 1;
     try {
       // Ensure id is a number if your backend expects a number
-      await addToCart(Number(product.id), quantity, product.supplierId);
+      await addToCart(product.id, quantity, product.supplierId);
       setQuantities(prev => ({ ...prev, [product.id]: product.minOrderQuantity || 1 }));
     } catch (error) {
       console.error("Error adding to cart:", error);
@@ -41,6 +72,54 @@ export default function Products() {
 
   const handleMoreFilters = () => {
     toast({ title: "More Filters", description: "Filter functionality coming soon!" });
+  };
+
+  // Add product: always create supplier first, then product with returned supplierId
+  const onAddProduct = async (data: any) => {
+    try {
+      // 1. Create supplier
+      const supplierPayload = {
+        businessName: data.supplierBusinessName,
+        rating: data.supplierRating !== undefined && data.supplierRating !== null ? String(data.supplierRating) : undefined,
+        address: data.supplierAddress,
+        userId: user?.id,
+      };
+      const supplierRes = await fetch("/api/suppliers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(supplierPayload),
+      });
+      if (!supplierRes.ok) throw new Error("Supplier creation failed");
+      const supplier = await supplierRes.json();
+      const supplierId = supplier.id;
+
+      // 2. Create product with supplierId (only product fields)
+      const productRes = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: data.name,
+          description: data.description,
+          unit: data.unit,
+          pricePerUnit: String(data.pricePerUnit),
+          stockQuantity: String(data.stockQuantity),
+          minOrderQuantity: String(data.minOrderQuantity),
+          categoryId: data.categoryId,
+          imageUrl: data.imageUrl,
+          supplierId,
+        }),
+      });
+      if (!productRes.ok) throw new Error("Product creation failed");
+
+      toast({ title: "Product added!" });
+      setAddOpen(false);
+      addForm.reset();
+      if (typeof window !== "undefined" && window.location) {
+        window.location.reload();
+      }
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message || "Could not add product", variant: "destructive" });
+    }
   };
 
   useEffect(() => {
@@ -209,9 +288,79 @@ export default function Products() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8 pb-20 md:pb-8">
         
         {/* Page Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-neutral-800 mb-2">Products</h1>
-          <p className="text-neutral-500">Browse raw materials from verified suppliers</p>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-neutral-800">Products</h1>
+          {(user?.role === "supplier" || user?.role === "admin") ? (
+            <Dialog open={addOpen} onOpenChange={setAddOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-primary text-white">Add Product</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Product</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={addForm.handleSubmit(onAddProduct)} className="space-y-4">
+                  <div>
+                    <Input placeholder="Name" {...addForm.register("name" )} />
+                    {addForm.formState.errors.name && <p className="text-red-500 text-xs mt-1">{addForm.formState.errors.name.message}</p>}
+                  </div>
+                  <div>
+                    <Input placeholder="Description" {...addForm.register("description" )} />
+                    {addForm.formState.errors.description && <p className="text-red-500 text-xs mt-1">{addForm.formState.errors.description.message}</p>}
+                  </div>
+                  <div>
+                    <Input placeholder="Unit (e.g. kg, liter)" {...addForm.register("unit" )} />
+                    {addForm.formState.errors.unit && <p className="text-red-500 text-xs mt-1">{addForm.formState.errors.unit.message}</p>}
+                  </div>
+                  <div>
+                  <Input placeholder="Price per unit" type="number" {...addForm.register("pricePerUnit", { valueAsNumber: true })} />
+                    {addForm.formState.errors.pricePerUnit && <p className="text-red-500 text-xs mt-1">{addForm.formState.errors.pricePerUnit.message}</p>}
+                  </div>
+                  <div>
+                  <Input placeholder="Stock quantity" type="number" {...addForm.register("stockQuantity", { valueAsNumber: true })} />
+                    {addForm.formState.errors.stockQuantity && <p className="text-red-500 text-xs mt-1">{addForm.formState.errors.stockQuantity.message}</p>}
+                  </div>
+                  <div>
+                  <Input placeholder="Minimum order quantity" type="number" {...addForm.register("minOrderQuantity", { valueAsNumber: true })} />
+                    {addForm.formState.errors.minOrderQuantity && <p className="text-red-500 text-xs mt-1">{addForm.formState.errors.minOrderQuantity.message}</p>}
+                  </div>
+                  <div>
+                    <select {...addForm.register("categoryId" )} className="w-full border rounded p-2">
+                      {(Array.isArray(categories) ? categories : []).map((cat: any) => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </select>
+                    {addForm.formState.errors.categoryId && <p className="text-red-500 text-xs mt-1">{addForm.formState.errors.categoryId.message}</p>}
+                  </div>
+                  <div>
+                    <Input placeholder="Image URL or emoji" {...addForm.register("imageUrl" )} />
+                    {addForm.formState.errors.imageUrl && <p className="text-red-500 text-xs mt-1">{addForm.formState.errors.imageUrl.message}</p>}
+                  </div>
+                  {/* Supplier fields for creation */}
+                  <div className="pt-2 border-t mt-2">
+                    <h4 className="font-semibold text-neutral-700 mb-2 text-sm">Supplier Info</h4>
+                    <div>
+                      <Input placeholder="Supplier Business Name" {...addForm.register("supplierBusinessName" )} />
+                      {addForm.formState.errors.supplierBusinessName && <p className="text-red-500 text-xs mt-1">{addForm.formState.errors.supplierBusinessName.message}</p>}
+                    </div>
+                    <div>
+                      <Input placeholder="Supplier Rating (e.g. 4.5)" type="number" step="0.1" {...addForm.register("supplierRating", { valueAsNumber: true })} />
+                      {addForm.formState.errors.supplierRating && <p className="text-red-500 text-xs mt-1">{addForm.formState.errors.supplierRating.message}</p>}
+                    </div>
+                    <div>
+                      <Input placeholder="Supplier Address" {...addForm.register("supplierAddress" )} />
+                      {addForm.formState.errors.supplierAddress && <p className="text-red-500 text-xs mt-1">{addForm.formState.errors.supplierAddress.message}</p>}
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit" className="bg-primary text-white">Add</Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          ) : (
+            <span className="text-sm text-neutral-400">Only suppliers and admins can add products.</span>
+          )}
         </div>
 
         {/* Inventory Alerts */}
@@ -355,7 +504,7 @@ export default function Products() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => toast({ title: 'Decrease quantity', description: 'Quantity selector works!' })}
+                          onClick={() => handleQuantityChange(product.id, Math.max((quantities[product.id] || product.minOrderQuantity || 1) - 1, product.minOrderQuantity || 1))}
                           className="h-8 w-8 p-0"
                         >
                           -
@@ -366,7 +515,7 @@ export default function Products() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => toast({ title: 'Increase quantity', description: 'Quantity selector works!' })}
+                          onClick={() => handleQuantityChange(product.id, (quantities[product.id] || product.minOrderQuantity || 1) + 1)}
                           className="h-8 w-8 p-0"
                         >
                           +

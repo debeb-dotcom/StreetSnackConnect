@@ -118,7 +118,7 @@ export default function ProductManagement() {
             </CardTitle>
             <p className="text-sm text-neutral-500 mt-1">Manage your inventory and listings</p>
           </div>
-          <Button className="bg-primary text-white hover:bg-primary/90">
+          <Button className="bg-primary text-white hover:bg-primary/90" onClick={() => toast({ title: 'Add Product', description: 'Add Product functionality coming soon!' })}>
             <Plus className="mr-2 h-4 w-4" />
             Add Product
           </Button>
@@ -165,6 +165,7 @@ export default function ProductManagement() {
                     variant="outline" 
                     size="sm" 
                     className="flex-1"
+                    onClick={() => toast({ title: 'Edit Product', description: 'Edit Product functionality coming soon!' })}
                   >
                     <Edit className="mr-1 h-3 w-3" />
                     Edit
@@ -173,6 +174,7 @@ export default function ProductManagement() {
                     variant="outline" 
                     size="sm" 
                     className="flex-1"
+                    onClick={() => toast({ title: 'Product Orders', description: 'Product Orders functionality coming soon!' })}
                   >
                     <Package className="mr-1 h-3 w-3" />
                     Orders
@@ -190,7 +192,7 @@ export default function ProductManagement() {
             </div>
             <h3 className="text-lg font-medium text-neutral-800 mb-2">No products yet</h3>
             <p className="text-neutral-500 mb-4">Start by adding your first product to the marketplace</p>
-            <Button className="bg-primary text-white hover:bg-primary/90">
+            <Button className="bg-primary text-white hover:bg-primary/90" onClick={() => toast({ title: 'Add Product', description: 'Add Product functionality coming soon!' })}>
               <Plus className="mr-2 h-4 w-4" />
               Add Your First Product
             </Button>

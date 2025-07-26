@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
+import { useCart } from "@/hooks/use-cart";
+import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, ShoppingCart, X, RefreshCw, Package } from "lucide-react";
 
 interface InventoryAlert {
@@ -22,6 +24,8 @@ interface InventoryAlert {
 export default function InventoryAlerts() {
   const { user } = useAuth();
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
+  const { addToCart } = useCart();
+  const { toast } = useToast();
 
   // Mock inventory alerts with realistic data
   const mockAlerts: InventoryAlert[] = [
@@ -112,7 +116,7 @@ export default function InventoryAlerts() {
   };
 
   const dismissAlert = (alertId: string) => {
-    setDismissedAlerts(prev => new Set([...prev, alertId]));
+    setDismissedAlerts(prev => new Set([...Array.from(prev), alertId]));
   };
 
   const getStockPercentage = (current: number, threshold: number) => {
@@ -127,9 +131,13 @@ export default function InventoryAlerts() {
     return `${days} days ago`;
   };
 
-  const handleQuickOrder = (alert: InventoryAlert) => {
-    // In a real app, this would open an order modal or redirect to supplier
-    console.log(`Quick order for ${alert.productName} from ${alert.supplier}`);
+  const handleQuickOrder = async (alert: InventoryAlert) => {
+    try {
+      await addToCart(alert.id, alert.avgWeeklyUsage || 1, "supplier1"); // Use alert.id as productId, avgWeeklyUsage as quantity
+      toast({ title: `Added ${alert.productName} to cart!` });
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to add to cart', variant: 'destructive' });
+    }
   };
 
   if (visibleAlerts.length === 0) {

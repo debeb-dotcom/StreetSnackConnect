@@ -12,6 +12,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Header from "@/components/layout/header";
 import MobileNav from "@/components/layout/mobile-nav";
 import { Search, MapPin, Star, Phone, Clock, Store, Filter, MessageCircle } from "lucide-react";
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { insertSupplierSchema } from "@shared/schema";
 
 export default function Suppliers() {
   const { user, isLoading } = useAuth();
@@ -20,6 +24,17 @@ export default function Suppliers() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [sortBy, setSortBy] = useState("rating");
+  const [addOpen, setAddOpen] = useState(false);
+  const addForm = useForm({
+    resolver: zodResolver(insertSupplierSchema),
+    defaultValues: {
+      businessName: "",
+      description: "",
+      address: "",
+      latitude: "",
+      longitude: "",
+    },
+  });
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -199,6 +214,22 @@ export default function Suppliers() {
     }
   };
 
+  const onAddSupplier = async (data: any) => {
+    try {
+      await fetch("/api/suppliers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...data, isVerified: true }),
+      });
+      toast({ title: "Supplier added!" });
+      setAddOpen(false);
+      addForm.reset();
+      // Optionally: refetch suppliers
+    } catch (e) {
+      toast({ title: "Error", description: "Could not add supplier", variant: "destructive" });
+    }
+  };
+
   if (isLoading) {
     return <div className="min-h-screen bg-neutral-50" />;
   }
@@ -212,12 +243,35 @@ export default function Suppliers() {
       <Header />
       
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8 pb-20 md:pb-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-20 md:pb-8">
         
         {/* Page Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-neutral-800 mb-2">Suppliers</h1>
-          <p className="text-neutral-500">Find verified suppliers in your area</p>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-neutral-800">Suppliers</h1>
+          {(user?.role === "admin" || user?.role === "supplier") ? (
+            <Dialog open={addOpen} onOpenChange={setAddOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-primary text-white">Add Supplier</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Supplier</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={addForm.handleSubmit(onAddSupplier)} className="space-y-4">
+                  <Input placeholder="Business Name" {...addForm.register("businessName")} />
+                  <Input placeholder="Description" {...addForm.register("description")} />
+                  <Input placeholder="Address" {...addForm.register("address")} />
+                  <Input placeholder="Latitude" {...addForm.register("latitude")} />
+                  <Input placeholder="Longitude" {...addForm.register("longitude")} />
+                  <DialogFooter>
+                    <Button type="submit" className="bg-primary text-white">Add</Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          ) : (
+            <span className="text-sm text-neutral-400">Only admins and suppliers can add suppliers.</span>
+          )}
         </div>
 
         {/* Search and Filters */}

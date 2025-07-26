@@ -1,17 +1,23 @@
 import { Link } from "wouter";
 import { Home, Search, ShoppingCart, User, Package } from "lucide-react";
 import { useCart } from "@/hooks/use-cart";
+import { useAuth } from "@/hooks/use-auth";
 import { Badge } from "@/components/ui/badge";
 
 export default function MobileNav() {
   let totalItemsCount = 0;
-  
+  let isSupplier = false;
   try {
     const cart = useCart();
     totalItemsCount = cart.totalItemsCount;
   } catch (error) {
-    // Cart provider not available yet
     totalItemsCount = 0;
+  }
+  try {
+    const { user, supplier } = useAuth();
+    isSupplier = !!supplier || user?.role === "supplier";
+  } catch (error) {
+    isSupplier = false;
   }
 
   return (
@@ -29,17 +35,20 @@ export default function MobileNav() {
             <span className="text-xs">Products</span>
           </span>
         </Link>
-        <Link href="/cart">
-          <span className="flex flex-col items-center py-2 px-3 text-neutral-400 cursor-pointer relative">
-            <ShoppingCart className="h-5 w-5 mb-1" />
-            {totalItemsCount > 0 && (
-              <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full text-xs p-0 bg-primary text-white flex items-center justify-center">
-                {totalItemsCount > 99 ? "99+" : totalItemsCount}
-              </Badge>
-            )}
-            <span className="text-xs">Cart</span>
-          </span>
-        </Link>
+        {/* Only show Cart if not supplier */}
+        {!isSupplier && (
+          <Link href="/cart">
+            <span className="flex flex-col items-center py-2 px-3 text-neutral-400 cursor-pointer relative">
+              <ShoppingCart className="h-5 w-5 mb-1" />
+              {totalItemsCount > 0 && (
+                <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full text-xs p-0 bg-primary text-white flex items-center justify-center">
+                  {totalItemsCount > 99 ? "99+" : totalItemsCount}
+                </Badge>
+              )}
+              <span className="text-xs">Cart</span>
+            </span>
+          </Link>
+        )}
         <Link href="/orders">
           <span className="flex flex-col items-center py-2 px-3 text-neutral-400 cursor-pointer">
             <Package className="h-5 w-5 mb-1" />
