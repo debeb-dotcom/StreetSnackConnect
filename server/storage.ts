@@ -119,6 +119,9 @@ export class MemStorage implements IStorage {
       ...insertUser, 
       id,
       createdAt: new Date(),
+      role: insertUser.role || "vendor",
+      isVerified: insertUser.isVerified || false,
+      phone: insertUser.phone || null,
     };
     this.users.set(id, user);
     return user;
@@ -148,6 +151,13 @@ export class MemStorage implements IStorage {
       ...insertSupplier, 
       id,
       createdAt: new Date(),
+      isVerified: insertSupplier.isVerified || false,
+      description: insertSupplier.description || null,
+      latitude: insertSupplier.latitude || null,
+      longitude: insertSupplier.longitude || null,
+      rating: insertSupplier.rating || null,
+      totalRatings: insertSupplier.totalRatings || null,
+      verificationStatus: insertSupplier.verificationStatus || "pending",
     };
     this.suppliers.set(id, supplier);
     return supplier;
@@ -190,7 +200,11 @@ export class MemStorage implements IStorage {
 
   async createCategory(category: InsertCategory): Promise<Category> {
     const id = randomUUID();
-    const newCategory: Category = { ...category, id };
+    const newCategory: Category = { 
+      ...category, 
+      id,
+      description: category.description || null,
+    };
     this.categories.set(id, newCategory);
     return newCategory;
   }
@@ -224,6 +238,11 @@ export class MemStorage implements IStorage {
       ...insertProduct, 
       id,
       createdAt: new Date(),
+      description: insertProduct.description || null,
+      stockQuantity: insertProduct.stockQuantity || null,
+      minOrderQuantity: insertProduct.minOrderQuantity || null,
+      imageUrl: insertProduct.imageUrl || null,
+      isActive: insertProduct.isActive || true,
     };
     this.products.set(id, product);
     return product;
@@ -271,6 +290,12 @@ export class MemStorage implements IStorage {
       ...insertOrder, 
       id: `ORD-${id.slice(0, 6).toUpperCase()}`,
       createdAt: new Date(),
+      status: insertOrder.status || "pending",
+      estimatedDelivery: insertOrder.estimatedDelivery || null,
+      actualDelivery: insertOrder.actualDelivery || null,
+      paymentMethod: insertOrder.paymentMethod || null,
+      paymentStatus: insertOrder.paymentStatus || null,
+      notes: insertOrder.notes || null,
     };
     this.orders.set(order.id, order);
     return order;
@@ -306,6 +331,7 @@ export class MemStorage implements IStorage {
       ...insertReview, 
       id,
       createdAt: new Date(),
+      comment: insertReview.comment || null,
     };
     this.reviews.set(id, review);
     return review;

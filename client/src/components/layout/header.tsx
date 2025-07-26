@@ -38,13 +38,13 @@ export default function Header({ onMobileMenuToggle }: HeaderProps) {
             <nav className="hidden md:ml-10 md:flex space-x-8">
               {navItems.map((item) => (
                 <Link key={item.href} href={item.href}>
-                  <a className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  <span className={`px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
                     item.active 
                       ? "text-neutral-800 bg-neutral-100" 
                       : "text-neutral-500 hover:text-primary"
                   }`}>
                     {item.label}
-                  </a>
+                  </span>
                 </Link>
               ))}
             </nav>

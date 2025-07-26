@@ -11,6 +11,7 @@ import ProductCategories from "@/components/dashboard/product-categories";
 import NearbySuppliers from "@/components/dashboard/nearby-suppliers";
 import PriceComparison from "@/components/dashboard/price-comparison";
 import RecentOrders from "@/components/dashboard/recent-orders";
+import InventoryAlerts from "@/components/inventory/inventory-alerts";
 import { Search, Plus, Filter } from "lucide-react";
 
 export default function Dashboard() {
@@ -59,6 +60,11 @@ export default function Dashboard() {
         
         {/* Dashboard Stats */}
         <StatsOverview />
+
+        {/* Inventory Alerts */}
+        <div className="mb-8">
+          <InventoryAlerts />
+        </div>
 
         {/* Quick Actions & Search */}
         <div className="mb-8">
