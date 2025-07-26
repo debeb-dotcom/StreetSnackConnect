@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/use-auth";
-import { Bell, Menu } from "lucide-react";
+import { useCart } from "@/hooks/use-cart";
+import { Bell, Menu, ShoppingCart } from "lucide-react";
 
 interface HeaderProps {
   onMobileMenuToggle?: () => void;
@@ -13,6 +15,14 @@ interface HeaderProps {
 export default function Header({ onMobileMenuToggle }: HeaderProps) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+  
+  let totalItemsCount = 0;
+  try {
+    const cart = useCart();
+    totalItemsCount = cart.totalItemsCount;
+  } catch (error) {
+    totalItemsCount = 0;
+  }
 
   const handleLogout = () => {
     logout();
@@ -23,6 +33,7 @@ export default function Header({ onMobileMenuToggle }: HeaderProps) {
     { href: "/products", label: "Products", active: location === "/products" },
     { href: "/suppliers", label: "Suppliers", active: location === "/suppliers" },
     { href: "/orders", label: "Orders", active: location === "/orders" },
+    { href: "/cart", label: "Cart", active: location === "/cart" },
   ];
 
   return (
@@ -53,6 +64,17 @@ export default function Header({ onMobileMenuToggle }: HeaderProps) {
           <div className="flex items-center space-x-4">
             <div className="hidden md:block">
               <div className="flex items-center space-x-3">
+                <Link href="/cart">
+                  <Button variant="ghost" size="icon" className="text-neutral-500 hover:text-neutral-800 relative">
+                    <ShoppingCart className="h-5 w-5" />
+                    {totalItemsCount > 0 && (
+                      <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full text-xs p-0 bg-primary text-white flex items-center justify-center">
+                        {totalItemsCount > 99 ? "99+" : totalItemsCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </Link>
+                
                 <Button variant="ghost" size="icon" className="text-neutral-500 hover:text-neutral-800">
                   <Bell className="h-5 w-5" />
                 </Button>

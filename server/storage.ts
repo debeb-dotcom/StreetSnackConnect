@@ -10,7 +10,13 @@ import {
   type Order,
   type InsertOrder,
   type Review,
-  type InsertReview
+  type InsertReview,
+  type Cart,
+  type InsertCart,
+  type CartItem,
+  type InsertCartItem,
+  type Payment,
+  type InsertPayment
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -50,6 +56,19 @@ export interface IStorage {
   getReviews(filters?: { supplierId?: string; vendorId?: string }): Promise<Review[]>;
   createReview(review: InsertReview): Promise<Review>;
 
+  // Cart methods
+  getCarts(vendorId: string): Promise<any[]>;
+  getCart(cartId: string): Promise<any | undefined>;
+  addToCart(vendorId: string, productId: string, quantity: number, supplierId: string): Promise<any>;
+  updateCartItem(cartId: string, itemId: string, quantity: number): Promise<boolean>;
+  removeCartItem(cartId: string, itemId: string): Promise<boolean>;
+  clearCart(cartId: string): Promise<boolean>;
+
+  // Payment methods
+  createPayment(payment: InsertPayment): Promise<Payment>;
+  updatePayment(id: string, updates: Partial<Payment>): Promise<Payment | undefined>;
+  getPayment(id: string): Promise<Payment | undefined>;
+
   // Analytics methods
   getDashboardStats(userId: string, role: string): Promise<any>;
   getPlatformAnalytics(): Promise<any>;
@@ -62,6 +81,9 @@ export class MemStorage implements IStorage {
   private products: Map<string, Product>;
   private orders: Map<string, Order>;
   private reviews: Map<string, Review>;
+  private carts: Map<string, Cart>;
+  private cartItems: Map<string, CartItem>;
+  private payments: Map<string, Payment>;
 
   constructor() {
     this.users = new Map();
@@ -70,6 +92,9 @@ export class MemStorage implements IStorage {
     this.products = new Map();
     this.orders = new Map();
     this.reviews = new Map();
+    this.carts = new Map();
+    this.cartItems = new Map();
+    this.payments = new Map();
     
     this.initializeData();
   }
@@ -335,6 +360,216 @@ export class MemStorage implements IStorage {
     };
     this.reviews.set(id, review);
     return review;
+  }
+
+  // Cart methods
+  async getCarts(vendorId: string): Promise<any[]> {
+    const userCarts = Array.from(this.carts.values()).filter(cart => cart.vendorId === vendorId);
+    
+    return userCarts.map(cart => {
+      const items = Array.from(this.cartItems.values())
+        .filter(item => item.cartId === cart.id)
+        .map(item => {
+          const product = this.products.get(item.productId);
+          const supplier = this.suppliers.get(cart.supplierId);
+          return {
+            ...item,
+            productName: product?.name || "Unknown Product",
+            unit: product?.unit || "unit",
+            supplierName: supplier?.businessName || "Unknown Supplier",
+            imageUrl: product?.imageUrl,
+            stockQuantity: product?.stockQuantity,
+            minOrderQuantity: product?.minOrderQuantity,
+          };
+        });
+      
+      const totalAmount = items.reduce((sum, item) => sum + (item.pricePerUnit * item.quantity), 0);
+      const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+      
+      return {
+        ...cart,
+        items,
+        totalAmount,
+        totalItems,
+      };
+    });
+  }
+
+  async getCart(cartId: string): Promise<any | undefined> {
+    const cart = this.carts.get(cartId);
+    if (!cart) return undefined;
+
+    const items = Array.from(this.cartItems.values())
+      .filter(item => item.cartId === cartId)
+      .map(item => {
+        const product = this.products.get(item.productId);
+        const supplier = this.suppliers.get(cart.supplierId);
+        return {
+          ...item,
+          productName: product?.name || "Unknown Product",
+          unit: product?.unit || "unit",
+          supplierName: supplier?.businessName || "Unknown Supplier",
+          imageUrl: product?.imageUrl,
+          stockQuantity: product?.stockQuantity,
+          minOrderQuantity: product?.minOrderQuantity,
+        };
+      });
+    
+    const totalAmount = items.reduce((sum, item) => sum + (item.pricePerUnit * item.quantity), 0);
+    const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+    
+    return {
+      ...cart,
+      items,
+      totalAmount,
+      totalItems,
+    };
+  }
+
+  async addToCart(vendorId: string, productId: string, quantity: number, supplierId: string): Promise<any> {
+    const product = this.products.get(productId);
+    if (!product) throw new Error("Product not found");
+
+    // Find or create cart for this vendor-supplier combination
+    let cart = Array.from(this.carts.values())
+      .find(c => c.vendorId === vendorId && c.supplierId === supplierId);
+    
+    if (!cart) {
+      const cartId = randomUUID();
+      cart = {
+        id: cartId,
+        vendorId,
+        supplierId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      this.carts.set(cartId, cart);
+    }
+
+    // Check if item already exists in cart
+    const existingItem = Array.from(this.cartItems.values())
+      .find(item => item.cartId === cart.id && item.productId === productId);
+
+    if (existingItem) {
+      // Update quantity
+      const updatedItem: CartItem = {
+        ...existingItem,
+        quantity: existingItem.quantity + quantity,
+        updatedAt: new Date(),
+      };
+      this.cartItems.set(existingItem.id, updatedItem);
+    } else {
+      // Add new item
+      const itemId = randomUUID();
+      const cartItem: CartItem = {
+        id: itemId,
+        cartId: cart.id,
+        productId,
+        quantity,
+        pricePerUnit: parseFloat(product.pricePerUnit.toString()),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      this.cartItems.set(itemId, cartItem);
+    }
+
+    // Update cart timestamp
+    cart.updatedAt = new Date();
+    this.carts.set(cart.id, cart);
+
+    return this.getCart(cart.id);
+  }
+
+  async updateCartItem(cartId: string, itemId: string, quantity: number): Promise<boolean> {
+    const item = this.cartItems.get(itemId);
+    if (!item || item.cartId !== cartId) return false;
+
+    if (quantity <= 0) {
+      return this.removeCartItem(cartId, itemId);
+    }
+
+    const updatedItem: CartItem = {
+      ...item,
+      quantity,
+      updatedAt: new Date(),
+    };
+    this.cartItems.set(itemId, updatedItem);
+
+    // Update cart timestamp
+    const cart = this.carts.get(cartId);
+    if (cart) {
+      cart.updatedAt = new Date();
+      this.carts.set(cartId, cart);
+    }
+
+    return true;
+  }
+
+  async removeCartItem(cartId: string, itemId: string): Promise<boolean> {
+    const item = this.cartItems.get(itemId);
+    if (!item || item.cartId !== cartId) return false;
+
+    this.cartItems.delete(itemId);
+
+    // Update cart timestamp
+    const cart = this.carts.get(cartId);
+    if (cart) {
+      cart.updatedAt = new Date();
+      this.carts.set(cartId, cart);
+    }
+
+    return true;
+  }
+
+  async clearCart(cartId: string): Promise<boolean> {
+    const cart = this.carts.get(cartId);
+    if (!cart) return false;
+
+    // Remove all items
+    Array.from(this.cartItems.entries()).forEach(([itemId, item]) => {
+      if (item.cartId === cartId) {
+        this.cartItems.delete(itemId);
+      }
+    });
+
+    // Remove cart
+    this.carts.delete(cartId);
+    return true;
+  }
+
+  // Payment methods
+  async createPayment(insertPayment: InsertPayment): Promise<Payment> {
+    const id = randomUUID();
+    const payment: Payment = {
+      ...insertPayment,
+      id,
+      status: insertPayment.status || "pending",
+      paymentMethod: insertPayment.paymentMethod || null,
+      stripePaymentIntentId: insertPayment.stripePaymentIntentId || null,
+      currency: insertPayment.currency || "inr",
+      failureReason: insertPayment.failureReason || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.payments.set(id, payment);
+    return payment;
+  }
+
+  async updatePayment(id: string, updates: Partial<Payment>): Promise<Payment | undefined> {
+    const payment = this.payments.get(id);
+    if (!payment) return undefined;
+    
+    const updatedPayment = { 
+      ...payment, 
+      ...updates, 
+      updatedAt: new Date() 
+    };
+    this.payments.set(id, updatedPayment);
+    return updatedPayment;
+  }
+
+  async getPayment(id: string): Promise<Payment | undefined> {
+    return this.payments.get(id);
   }
 
   // Analytics methods

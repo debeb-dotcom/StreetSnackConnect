@@ -1,8 +1,17 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import Stripe from "stripe";
 import { storage } from "./storage";
 import { loginSchema, registerSchema, insertSupplierSchema, insertProductSchema, insertOrderSchema } from "@shared/schema";
 import { z } from "zod";
+
+// Initialize Stripe
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+}
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2025-06-30.basil",
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
@@ -183,6 +192,193 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/analytics", async (req, res) => {
     const analytics = await storage.getPlatformAnalytics();
     res.json(analytics);
+  });
+
+  // Cart routes
+  app.get("/api/carts/:vendorId", async (req, res) => {
+    try {
+      const carts = await storage.getCarts(req.params.vendorId);
+      res.json(carts);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/carts/add", async (req, res) => {
+    try {
+      const { productId, quantity, supplierId, vendorId } = req.body;
+      
+      if (!vendorId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const cart = await storage.addToCart(vendorId, productId, quantity, supplierId);
+      res.json(cart);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/carts/:cartId/items/:itemId", async (req, res) => {
+    try {
+      const { cartId, itemId } = req.params;
+      const { quantity } = req.body;
+      
+      const success = await storage.updateCartItem(cartId, itemId, quantity);
+      if (success) {
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ message: "Cart item not found" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/carts/:cartId/items/:itemId", async (req, res) => {
+    try {
+      const { cartId, itemId } = req.params;
+      
+      const success = await storage.removeCartItem(cartId, itemId);
+      if (success) {
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ message: "Cart item not found" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/carts/:cartId", async (req, res) => {
+    try {
+      const { cartId } = req.params;
+      
+      const success = await storage.clearCart(cartId);
+      if (success) {
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ message: "Cart not found" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Stripe payment routes
+  app.post("/api/create-checkout-session", async (req, res) => {
+    try {
+      const { cartId, deliveryAddress, notes, paymentMethod } = req.body;
+      
+      const cart = await storage.getCart(cartId);
+      if (!cart) {
+        return res.status(404).json({ message: "Cart not found" });
+      }
+
+      if (paymentMethod === "cod") {
+        // For Cash on Delivery, create order directly
+        const order = await storage.createOrder({
+          vendorId: cart.vendorId,
+          supplierId: cart.supplierId,
+          totalAmount: (cart.totalAmount * 1.18).toFixed(2), // Including GST
+          deliveryAddress,
+          notes: notes || null,
+          status: "pending",
+          paymentMethod: "cod",
+          items: JSON.stringify(cart.items),
+        });
+
+        // Clear cart after successful order
+        await storage.clearCart(cartId);
+
+        return res.json({ 
+          success: true, 
+          orderId: order.id,
+          url: `/orders?success=true&order_id=${order.id}` 
+        });
+      }
+
+      // For Stripe payments
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
+        line_items: cart.items.map((item: any) => ({
+          price_data: {
+            currency: "inr",
+            product_data: {
+              name: item.productName,
+              description: `From ${item.supplierName}`,
+            },
+            unit_amount: Math.round(item.pricePerUnit * 100), // Convert to paise
+          },
+          quantity: item.quantity,
+        })),
+        mode: "payment",
+        success_url: `${process.env.DOMAIN || 'http://localhost:5000'}/orders?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.DOMAIN || 'http://localhost:5000'}/cart`,
+        metadata: {
+          cartId,
+          deliveryAddress,
+          notes: notes || "",
+        },
+      });
+
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error("Checkout error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Stripe webhook for handling successful payments
+  app.post("/api/stripe-webhook", async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    let event;
+
+    try {
+      event = stripe.webhooks.constructEvent(req.body, sig!, process.env.STRIPE_WEBHOOK_SECRET!);
+    } catch (err: any) {
+      console.log(`Webhook signature verification failed.`, err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const { cartId, deliveryAddress, notes } = session.metadata!;
+
+      try {
+        const cart = await storage.getCart(cartId);
+        if (cart) {
+          // Create order
+          const order = await storage.createOrder({
+            vendorId: cart.vendorId,
+            supplierId: cart.supplierId,
+            totalAmount: (session.amount_total! / 100).toFixed(2),
+            deliveryAddress,
+            notes: notes || null,
+            status: "confirmed",
+            paymentMethod: "stripe",
+            items: JSON.stringify(cart.items),
+          });
+
+          // Create payment record
+          await storage.createPayment({
+            orderId: order.id,
+            amount: (session.amount_total! / 100).toFixed(2),
+            status: "completed",
+            paymentMethod: "stripe",
+            stripePaymentIntentId: session.payment_intent as string,
+            currency: "inr",
+          });
+
+          // Clear cart
+          await storage.clearCart(cartId);
+        }
+      } catch (error) {
+        console.error("Error processing successful payment:", error);
+      }
+    }
+
+    res.json({ received: true });
   });
 
   const httpServer = createServer(app);

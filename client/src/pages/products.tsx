@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { useCart } from "@/hooks/use-cart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,10 +15,26 @@ import { Search, Filter, ShoppingCart, Star, MapPin, AlertTriangle } from "lucid
 
 export default function Products() {
   const { user, isLoading } = useAuth();
+  const { addToCart } = useCart();
   const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [sortBy, setSortBy] = useState("price");
+  const [quantities, setQuantities] = useState<{ [key: string]: number }>({});
+
+  const handleQuantityChange = (productId: string, quantity: number) => {
+    setQuantities(prev => ({ ...prev, [productId]: quantity }));
+  };
+
+  const handleAddToCart = async (product: any) => {
+    const quantity = quantities[product.id] || product.minOrderQuantity || 1;
+    try {
+      await addToCart(product.id, quantity, product.supplierId);
+      setQuantities(prev => ({ ...prev, [product.id]: product.minOrderQuantity || 1 }));
+    } catch (error) {
+      console.error("Error adding to cart:", error);
+    }
+  };
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -303,10 +320,48 @@ export default function Products() {
                     </p>
                   </div>
                   
-                  <Button className="w-full bg-primary text-white hover:bg-primary/90">
-                    <ShoppingCart className="mr-2 h-4 w-4" />
-                    Add to Cart
-                  </Button>
+                  <div className="space-y-3">
+                    {/* Quantity Selector */}
+                    <div className="flex items-center justify-between bg-neutral-50 rounded-lg p-2">
+                      <span className="text-sm font-medium text-neutral-700">Quantity</span>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleQuantityChange(
+                            product.id, 
+                            Math.max((quantities[product.id] || product.minOrderQuantity || 1) - 1, product.minOrderQuantity || 1)
+                          )}
+                          className="h-8 w-8 p-0"
+                        >
+                          -
+                        </Button>
+                        <span className="text-sm font-medium w-12 text-center">
+                          {quantities[product.id] || product.minOrderQuantity || 1} {product.unit}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleQuantityChange(
+                            product.id, 
+                            (quantities[product.id] || product.minOrderQuantity || 1) + 1
+                          )}
+                          className="h-8 w-8 p-0"
+                        >
+                          +
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {/* Add to Cart Button */}
+                    <Button 
+                      className="w-full bg-primary text-white hover:bg-primary/90"
+                      onClick={() => handleAddToCart(product)}
+                    >
+                      <ShoppingCart className="mr-2 h-4 w-4" />
+                      Add ₹{((quantities[product.id] || product.minOrderQuantity || 1) * parseFloat(product.pricePerUnit)).toFixed(2)}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))
