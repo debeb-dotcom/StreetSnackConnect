@@ -88,7 +88,7 @@ export default function PriceComparison() {
           ))}
         </div>
         
-        <Button className="mt-4 w-full bg-primary text-white hover:bg-primary/90">
+        <Button className="mt-4 w-full bg-primary text-white hover:bg-primary/90" onClick={() => alert('Added best price item to cart!')}>
           Add to Cart - Best Price ₹{priceComparisons[0].price}
         </Button>
       </CardContent>

@@ -3,8 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Star, MapPin } from "lucide-react";
+import { useLocation } from "wouter";
 
 export default function NearbySuppliers() {
+  const [, setLocation] = useLocation();
   const { data: suppliers, isLoading } = useQuery({
     queryKey: ["/api/suppliers", { verified: true, limit: 5 }],
   });
@@ -85,7 +87,10 @@ export default function NearbySuppliers() {
             ))}
           </div>
           
-          <button className="mt-4 w-full text-primary hover:text-primary/80 text-sm font-medium py-2 transition-colors">
+          <button 
+            className="mt-4 w-full text-primary hover:text-primary/80 text-sm font-medium py-2 transition-colors"
+            onClick={() => setLocation("/suppliers")}
+          >
             View All Suppliers
           </button>
         </CardContent>

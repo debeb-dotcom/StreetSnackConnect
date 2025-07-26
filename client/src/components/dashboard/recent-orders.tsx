@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
 
 const statusColors = {
   pending: "bg-yellow-100 text-yellow-800",
@@ -15,6 +16,7 @@ const statusColors = {
 
 export default function RecentOrders() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   
   const { data: orders, isLoading } = useQuery({
     queryKey: ["/api/orders", { vendorId: user?.id }],
@@ -69,7 +71,7 @@ export default function RecentOrders() {
             </CardTitle>
             <p className="text-sm text-neutral-500 mt-1">Track your order status</p>
           </div>
-          <button className="text-primary hover:text-primary/80 text-sm font-medium">
+          <button className="text-primary hover:text-primary/80 text-sm font-medium" onClick={() => setLocation("/orders")}>
             View All
           </button>
         </div>

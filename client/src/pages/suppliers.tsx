@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import { Search, MapPin, Star, Phone, Clock, Store, Filter, MessageCircle } from
 
 export default function Suppliers() {
   const { user, isLoading } = useAuth();
+  const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
@@ -135,10 +137,10 @@ export default function Suppliers() {
     },
   ];
 
-  const displaySuppliers = suppliers?.length > 0 ? suppliers : mockSuppliers;
+  const displaySuppliers = Array.isArray(suppliers) && suppliers.length > 0 ? suppliers : mockSuppliers;
 
   // Filter and sort suppliers
-  const filteredSuppliers = displaySuppliers
+  const filteredSuppliers = Array.isArray(displaySuppliers) ? displaySuppliers
     .filter((supplier: any) => {
       const matchesSearch = supplier.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            supplier.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -174,7 +176,28 @@ export default function Suppliers() {
         default:
           return 0;
       }
-    });
+    }) : [];
+
+  // Button handlers
+  const handleMoreFilters = () => {
+    toast({ title: "More Filters", description: "Filter functionality coming soon!" });
+  };
+  const handleViewProducts = (supplier: any) => {
+    // Navigate to the products page with supplier id as a query param
+    setLocation(`/products?supplierId=${supplier.id}`);
+  };
+  const handlePhone = (supplier: any) => {
+    // Open phone dialer (works on mobile)
+    window.open(`tel:${supplier.phone}`);
+  };
+  const handleMessage = (supplier: any) => {
+    // Open WhatsApp chat if phone exists, else show a toast
+    if (supplier.phone) {
+      window.open(`https://wa.me/${supplier.phone.replace(/[^\d]/g, "")}`);
+    } else {
+      toast({ title: `No phone number for ${supplier.businessName}` });
+    }
+  };
 
   if (isLoading) {
     return <div className="min-h-screen bg-neutral-50" />;
@@ -235,7 +258,7 @@ export default function Suppliers() {
                     <SelectItem value="name">Name: A to Z</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button variant="outline" className="whitespace-nowrap">
+                <Button variant="outline" className="whitespace-nowrap" onClick={handleMoreFilters}>
                   <Filter className="mr-2 h-4 w-4" />
                   More Filters
                 </Button>
@@ -338,14 +361,14 @@ export default function Suppliers() {
                   </div>
                   
                   <div className="flex space-x-2">
-                    <Button className="flex-1 bg-primary text-white hover:bg-primary/90">
+                    <Button className="flex-1 bg-primary text-white hover:bg-primary/90" onClick={() => handleViewProducts(supplier)}>
                       <Store className="mr-2 h-4 w-4" />
                       View Products
                     </Button>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" onClick={() => handlePhone(supplier)}>
                       <Phone className="h-4 w-4" />
                     </Button>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" onClick={() => handleMessage(supplier)}>
                       <MessageCircle className="h-4 w-4" />
                     </Button>
                   </div>

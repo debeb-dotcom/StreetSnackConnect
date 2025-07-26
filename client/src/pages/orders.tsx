@@ -11,9 +11,12 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useCart } from "@/hooks/use-cart";
 import Header from "@/components/layout/header";
 import MobileNav from "@/components/layout/mobile-nav";
 import { Search, Package, Truck, Clock, MapPin, Phone, Eye, RotateCcw, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 const statusColors = {
   pending: { bg: "bg-yellow-100", text: "text-yellow-800", icon: Clock },
@@ -25,6 +28,34 @@ const statusColors = {
 };
 
 export default function Orders() {
+  // Track Order modal state
+  const [trackOrderOpen, setTrackOrderOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  // Handler for Track Order button
+  const handleTrackOrder = (order: any) => {
+    setSelectedOrder(order);
+    setTrackOrderOpen(true);
+  };
+
+  // Handler for Reorder button
+  const { addToCart } = useCart();
+  const handleReorder = async (order: any) => {
+    try {
+      for (const item of order.items) {
+        await addToCart(item.productId, item.quantity, order.supplierId);
+      }
+      toast({
+        title: "Reorder placed!",
+        description: `All items from Order #${order.id} have been added to your cart.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to reorder items.",
+        variant: "destructive",
+      });
+    }
+  };
   const { user, isLoading } = useAuth();
   const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
@@ -65,8 +96,8 @@ export default function Orders() {
       status: "in_transit",
       totalAmount: "1250.00",
       items: [
-        { productName: "Red Onions", quantity: 10, unit: "kg", pricePerUnit: 35, total: 350 },
-        { productName: "Fresh Tomatoes", quantity: 20, unit: "kg", pricePerUnit: 45, total: 900 },
+        { productId: "1", productName: "Red Onions", quantity: 10, unit: "kg", pricePerUnit: 35, total: 350, supplierId: "supplier1" },
+        { productId: "2", productName: "Fresh Tomatoes", quantity: 20, unit: "kg", pricePerUnit: 45, total: 900, supplierId: "supplier2" },
       ],
       deliveryAddress: "Main Street Food Court, Sector 15, Delhi",
       estimatedDelivery: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2 hours from now
@@ -95,8 +126,8 @@ export default function Orders() {
       status: "delivered",
       totalAmount: "850.00",
       items: [
-        { productName: "Cooking Oil", quantity: 5, unit: "liter", pricePerUnit: 120, total: 600 },
-        { productName: "Garam Masala", quantity: 1, unit: "kg", pricePerUnit: 250, total: 250 },
+        { productId: "4", productName: "Cooking Oil", quantity: 5, unit: "liter", pricePerUnit: 120, total: 600, supplierId: "supplier3" },
+        { productId: "6", productName: "Garam Masala", quantity: 1, unit: "kg", pricePerUnit: 250, total: 250, supplierId: "supplier5" },
       ],
       deliveryAddress: "Food Street, Connaught Place, Delhi",
       estimatedDelivery: new Date(Date.now() - 4 * 60 * 60 * 1000),
@@ -126,7 +157,7 @@ export default function Orders() {
       status: "pending",
       totalAmount: "1500.00",
       items: [
-        { productName: "Basmati Rice", quantity: 25, unit: "kg", pricePerUnit: 60, total: 1500 },
+        { productId: "5", productName: "Basmati Rice", quantity: 25, unit: "kg", pricePerUnit: 60, total: 1500, supplierId: "supplier4" },
       ],
       deliveryAddress: "Rajouri Garden Market, Delhi",
       estimatedDelivery: new Date(Date.now() + 24 * 60 * 60 * 1000), // Tomorrow
@@ -175,6 +206,14 @@ export default function Orders() {
     updateOrderMutation.mutate({
       id: orderId,
       updates: { status: "cancelled" },
+    }, {
+      onSuccess: () => {
+        toast({
+          title: "Order cancelled",
+          description: `Order #${orderId} has been cancelled.`,
+          variant: "destructive",
+        });
+      }
     });
   };
 
@@ -308,10 +347,9 @@ export default function Orders() {
               const statusColor = statusColors[order.status as keyof typeof statusColors] || statusColors.pending;
               
               return (
-                <Card key={order.id} className="border border-neutral-200 hover:shadow-md transition-shadow">
+                <Card key={order.id} className={`border border-neutral-200 hover:shadow-md transition-shadow ${order.status === "cancelled" ? "opacity-70" : ""}`}>
                   <CardContent className="p-4 md:p-6">
                     <div className="flex flex-col lg:flex-row gap-6">
-                      
                       {/* Order Details */}
                       <div className="flex-1">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
@@ -321,6 +359,9 @@ export default function Orders() {
                               <StatusIcon className="mr-1 h-3 w-3" />
                               {order.status.replace('_', ' ').toUpperCase()}
                             </Badge>
+                            {order.status === "cancelled" && (
+                              <Badge className="bg-red-600 text-white text-xs ml-2">CANCELLED</Badge>
+                            )}
                           </div>
                           <span className="text-sm text-neutral-500">
                             {getTimeAgo(new Date(order.createdAt))}
@@ -401,7 +442,7 @@ export default function Orders() {
                         )}
                         
                         <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row space-y-2 sm:space-y-0 sm:space-x-2 lg:space-y-2 lg:space-x-0 xl:space-y-0 xl:space-x-2">
-                          <Button variant="outline" className="flex-1">
+                          <Button variant="outline" className="flex-1" onClick={() => handleTrackOrder(order)}>
                             <Eye className="mr-2 h-4 w-4" />
                             Track Order
                           </Button>
@@ -417,7 +458,7 @@ export default function Orders() {
                             </Button>
                           )}
                           {order.status === "delivered" && (
-                            <Button className="flex-1 bg-primary text-white hover:bg-primary/90">
+                            <Button className="flex-1 bg-primary text-white hover:bg-primary/90" onClick={() => handleReorder(order)}>
                               <RotateCcw className="mr-2 h-4 w-4" />
                               Reorder
                             </Button>
@@ -452,6 +493,34 @@ export default function Orders() {
         )}
       </div>
 
+      {/* Track Order Modal */}
+      <Dialog open={trackOrderOpen} onOpenChange={setTrackOrderOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Order Tracking</DialogTitle>
+            <DialogDescription>
+              {selectedOrder ? `Tracking for Order #${selectedOrder.id}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedOrder && (
+            <div className="space-y-4">
+              <div className="font-medium text-neutral-800">Current Status: <span className="capitalize">{selectedOrder.status.replace('_', ' ')}</span></div>
+              <ol className="relative border-l border-neutral-200">
+                {selectedOrder.trackingSteps?.map((step: any, idx: number) => (
+                  <li key={idx} className="mb-6 ml-4">
+                    <div className="absolute w-3 h-3 bg-primary rounded-full mt-1.5 -left-1.5 border border-white" />
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-neutral-700">{step.status.replace('_', ' ')}</span>
+                      <span className="text-xs text-neutral-400">{new Date(step.timestamp).toLocaleString()}</span>
+                    </div>
+                    <div className="text-sm text-neutral-600">{step.description}</div>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
       <MobileNav />
     </div>
   );

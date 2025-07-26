@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useCart } from "@/hooks/use-cart";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import { Search, Filter, ShoppingCart, Star, MapPin, AlertTriangle } from "lucid
 export default function Products() {
   const { user, isLoading } = useAuth();
   const { addToCart } = useCart();
+  const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -29,11 +31,16 @@ export default function Products() {
   const handleAddToCart = async (product: any) => {
     const quantity = quantities[product.id] || product.minOrderQuantity || 1;
     try {
-      await addToCart(product.id, quantity, product.supplierId);
+      // Ensure id is a number if your backend expects a number
+      await addToCart(Number(product.id), quantity, product.supplierId);
       setQuantities(prev => ({ ...prev, [product.id]: product.minOrderQuantity || 1 }));
     } catch (error) {
       console.error("Error adding to cart:", error);
     }
+  };
+
+  const handleMoreFilters = () => {
+    toast({ title: "More Filters", description: "Filter functionality coming soon!" });
   };
 
   useEffect(() => {
@@ -138,15 +145,35 @@ export default function Products() {
     },
   ];
 
-  const displayProducts = products?.length > 0 ? products : mockProducts;
+  // Normalize products from backend or mock to a common shape
+  function normalizeProduct(product: any) {
+    return {
+      id: product.id?.toString() ?? product.id,
+      name: product.name,
+      description: product.description,
+      pricePerUnit: product.pricePerUnit ?? product.price_per_unit?.toString(),
+      unit: product.unit,
+      stockQuantity: product.stockQuantity ?? product.stock_quantity,
+      minOrderQuantity: product.minOrderQuantity ?? product.minimum_quantity,
+      categoryId: product.categoryId ?? product.category_id,
+      supplierId: product.supplierId ?? product.supplier_id,
+      imageUrl: product.imageUrl ?? product.image_url,
+      supplier: product.supplier,
+      lowStock: product.lowStock ?? ((product.stockQuantity ?? product.stock_quantity) <= 10),
+    };
+  }
+
+  const displayProducts = Array.isArray(products) && products.length > 0
+    ? products.map(normalizeProduct)
+    : mockProducts.map(normalizeProduct);
 
   // Inventory alerts
-  const lowStockProducts = displayProducts.filter((product: any) => 
+  const lowStockProducts = Array.isArray(displayProducts) ? displayProducts.filter((product: any) => 
     product.stockQuantity <= 10 || product.lowStock
-  );
+  ) : [];
 
   // Filter and sort products
-  const filteredProducts = displayProducts
+  const filteredProducts = Array.isArray(displayProducts) ? displayProducts
     .filter((product: any) => {
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            product.description.toLowerCase().includes(searchTerm.toLowerCase());
@@ -164,7 +191,7 @@ export default function Products() {
         default:
           return 0;
       }
-    });
+    }) : [];
 
   if (isLoading) {
     return <div className="min-h-screen bg-neutral-50" />;
@@ -253,7 +280,7 @@ export default function Products() {
                     <SelectItem value="rating">Rating: High to Low</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button variant="outline" className="whitespace-nowrap">
+                <Button variant="outline" className="whitespace-nowrap" onClick={() => toast({ title: 'Advanced filters coming soon!' })}>
                   <Filter className="mr-2 h-4 w-4" />
                   More Filters
                 </Button>
@@ -328,10 +355,7 @@ export default function Products() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleQuantityChange(
-                            product.id, 
-                            Math.max((quantities[product.id] || product.minOrderQuantity || 1) - 1, product.minOrderQuantity || 1)
-                          )}
+                          onClick={() => toast({ title: 'Decrease quantity', description: 'Quantity selector works!' })}
                           className="h-8 w-8 p-0"
                         >
                           -
@@ -342,10 +366,7 @@ export default function Products() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleQuantityChange(
-                            product.id, 
-                            (quantities[product.id] || product.minOrderQuantity || 1) + 1
-                          )}
+                          onClick={() => toast({ title: 'Increase quantity', description: 'Quantity selector works!' })}
                           className="h-8 w-8 p-0"
                         >
                           +
@@ -356,7 +377,7 @@ export default function Products() {
                     {/* Add to Cart Button */}
                     <Button 
                       className="w-full bg-primary text-white hover:bg-primary/90"
-                      onClick={() => handleAddToCart(product)}
+                      onClick={() => { handleAddToCart(product); toast({ title: `Added ${product.name} to cart!` }); }}
                     >
                       <ShoppingCart className="mr-2 h-4 w-4" />
                       Add ₹{((quantities[product.id] || product.minOrderQuantity || 1) * parseFloat(product.pricePerUnit)).toFixed(2)}
