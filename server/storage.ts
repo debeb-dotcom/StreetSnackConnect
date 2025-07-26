@@ -1,0 +1,357 @@
+import { 
+  type User, 
+  type InsertUser, 
+  type Supplier, 
+  type InsertSupplier,
+  type Category,
+  type InsertCategory,
+  type Product,
+  type InsertProduct,
+  type Order,
+  type InsertOrder,
+  type Review,
+  type InsertReview
+} from "@shared/schema";
+import { randomUUID } from "crypto";
+
+export interface IStorage {
+  // User methods
+  getUser(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
+
+  // Supplier methods
+  getSupplier(id: string): Promise<Supplier | undefined>;
+  getSupplierByUserId(userId: string): Promise<Supplier | undefined>;
+  createSupplier(supplier: InsertSupplier): Promise<Supplier>;
+  updateSupplier(id: string, updates: Partial<Supplier>): Promise<Supplier | undefined>;
+  getSuppliers(filters?: { verified?: boolean; limit?: number }): Promise<Supplier[]>;
+  getNearbySuppliers(lat: number, lng: number, radius: number): Promise<Supplier[]>;
+
+  // Category methods
+  getCategories(): Promise<Category[]>;
+  createCategory(category: InsertCategory): Promise<Category>;
+
+  // Product methods
+  getProduct(id: string): Promise<Product | undefined>;
+  getProducts(filters?: { categoryId?: string; supplierId?: string; active?: boolean }): Promise<Product[]>;
+  createProduct(product: InsertProduct): Promise<Product>;
+  updateProduct(id: string, updates: Partial<Product>): Promise<Product | undefined>;
+  deleteProduct(id: string): Promise<boolean>;
+
+  // Order methods
+  getOrder(id: string): Promise<Order | undefined>;
+  getOrders(filters?: { vendorId?: string; supplierId?: string; status?: string }): Promise<Order[]>;
+  createOrder(order: InsertOrder): Promise<Order>;
+  updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined>;
+
+  // Review methods
+  getReviews(filters?: { supplierId?: string; vendorId?: string }): Promise<Review[]>;
+  createReview(review: InsertReview): Promise<Review>;
+
+  // Analytics methods
+  getDashboardStats(userId: string, role: string): Promise<any>;
+  getPlatformAnalytics(): Promise<any>;
+}
+
+export class MemStorage implements IStorage {
+  private users: Map<string, User>;
+  private suppliers: Map<string, Supplier>;
+  private categories: Map<string, Category>;
+  private products: Map<string, Product>;
+  private orders: Map<string, Order>;
+  private reviews: Map<string, Review>;
+
+  constructor() {
+    this.users = new Map();
+    this.suppliers = new Map();
+    this.categories = new Map();
+    this.products = new Map();
+    this.orders = new Map();
+    this.reviews = new Map();
+    
+    this.initializeData();
+  }
+
+  private initializeData() {
+    // Initialize categories
+    const categories = [
+      { id: randomUUID(), name: "Vegetables", description: "Fresh vegetables", icon: "fas fa-leaf", color: "green" },
+      { id: randomUUID(), name: "Oils", description: "Cooking oils", icon: "fas fa-oil-can", color: "yellow" },
+      { id: randomUUID(), name: "Spices", description: "Spices and masalas", icon: "fas fa-pepper-hot", color: "red" },
+      { id: randomUUID(), name: "Dairy", description: "Dairy products", icon: "fas fa-glass-whiskey", color: "blue" },
+      { id: randomUUID(), name: "Grains", description: "Rice, wheat, etc.", icon: "fas fa-seedling", color: "amber" },
+      { id: randomUUID(), name: "Meat", description: "Fresh meat", icon: "fas fa-drumstick-bite", color: "pink" },
+    ];
+
+    categories.forEach(cat => this.categories.set(cat.id, cat));
+
+    // Create admin user
+    const adminId = randomUUID();
+    const admin: User = {
+      id: adminId,
+      username: "admin",
+      email: "admin@supplylink.com",
+      password: "admin123",
+      role: "admin",
+      firstName: "Admin",
+      lastName: "User",
+      phone: "+91-9999999999",
+      isVerified: true,
+      createdAt: new Date(),
+    };
+    this.users.set(adminId, admin);
+  }
+
+  // User methods
+  async getUser(id: string): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(user => user.email === email);
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const id = randomUUID();
+    const user: User = { 
+      ...insertUser, 
+      id,
+      createdAt: new Date(),
+    };
+    this.users.set(id, user);
+    return user;
+  }
+
+  async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+    
+    const updatedUser = { ...user, ...updates };
+    this.users.set(id, updatedUser);
+    return updatedUser;
+  }
+
+  // Supplier methods
+  async getSupplier(id: string): Promise<Supplier | undefined> {
+    return this.suppliers.get(id);
+  }
+
+  async getSupplierByUserId(userId: string): Promise<Supplier | undefined> {
+    return Array.from(this.suppliers.values()).find(supplier => supplier.userId === userId);
+  }
+
+  async createSupplier(insertSupplier: InsertSupplier): Promise<Supplier> {
+    const id = randomUUID();
+    const supplier: Supplier = { 
+      ...insertSupplier, 
+      id,
+      createdAt: new Date(),
+    };
+    this.suppliers.set(id, supplier);
+    return supplier;
+  }
+
+  async updateSupplier(id: string, updates: Partial<Supplier>): Promise<Supplier | undefined> {
+    const supplier = this.suppliers.get(id);
+    if (!supplier) return undefined;
+    
+    const updatedSupplier = { ...supplier, ...updates };
+    this.suppliers.set(id, updatedSupplier);
+    return updatedSupplier;
+  }
+
+  async getSuppliers(filters?: { verified?: boolean; limit?: number }): Promise<Supplier[]> {
+    let suppliers = Array.from(this.suppliers.values());
+    
+    if (filters?.verified !== undefined) {
+      suppliers = suppliers.filter(s => s.isVerified === filters.verified);
+    }
+    
+    if (filters?.limit) {
+      suppliers = suppliers.slice(0, filters.limit);
+    }
+    
+    return suppliers;
+  }
+
+  async getNearbySuppliers(lat: number, lng: number, radius: number): Promise<Supplier[]> {
+    // Simple distance calculation for demo purposes
+    return Array.from(this.suppliers.values())
+      .filter(s => s.isVerified)
+      .slice(0, 10);
+  }
+
+  // Category methods
+  async getCategories(): Promise<Category[]> {
+    return Array.from(this.categories.values());
+  }
+
+  async createCategory(category: InsertCategory): Promise<Category> {
+    const id = randomUUID();
+    const newCategory: Category = { ...category, id };
+    this.categories.set(id, newCategory);
+    return newCategory;
+  }
+
+  // Product methods
+  async getProduct(id: string): Promise<Product | undefined> {
+    return this.products.get(id);
+  }
+
+  async getProducts(filters?: { categoryId?: string; supplierId?: string; active?: boolean }): Promise<Product[]> {
+    let products = Array.from(this.products.values());
+    
+    if (filters?.categoryId) {
+      products = products.filter(p => p.categoryId === filters.categoryId);
+    }
+    
+    if (filters?.supplierId) {
+      products = products.filter(p => p.supplierId === filters.supplierId);
+    }
+    
+    if (filters?.active !== undefined) {
+      products = products.filter(p => p.isActive === filters.active);
+    }
+    
+    return products;
+  }
+
+  async createProduct(insertProduct: InsertProduct): Promise<Product> {
+    const id = randomUUID();
+    const product: Product = { 
+      ...insertProduct, 
+      id,
+      createdAt: new Date(),
+    };
+    this.products.set(id, product);
+    return product;
+  }
+
+  async updateProduct(id: string, updates: Partial<Product>): Promise<Product | undefined> {
+    const product = this.products.get(id);
+    if (!product) return undefined;
+    
+    const updatedProduct = { ...product, ...updates };
+    this.products.set(id, updatedProduct);
+    return updatedProduct;
+  }
+
+  async deleteProduct(id: string): Promise<boolean> {
+    return this.products.delete(id);
+  }
+
+  // Order methods
+  async getOrder(id: string): Promise<Order | undefined> {
+    return this.orders.get(id);
+  }
+
+  async getOrders(filters?: { vendorId?: string; supplierId?: string; status?: string }): Promise<Order[]> {
+    let orders = Array.from(this.orders.values());
+    
+    if (filters?.vendorId) {
+      orders = orders.filter(o => o.vendorId === filters.vendorId);
+    }
+    
+    if (filters?.supplierId) {
+      orders = orders.filter(o => o.supplierId === filters.supplierId);
+    }
+    
+    if (filters?.status) {
+      orders = orders.filter(o => o.status === filters.status);
+    }
+    
+    return orders.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+  }
+
+  async createOrder(insertOrder: InsertOrder): Promise<Order> {
+    const id = randomUUID();
+    const order: Order = { 
+      ...insertOrder, 
+      id: `ORD-${id.slice(0, 6).toUpperCase()}`,
+      createdAt: new Date(),
+    };
+    this.orders.set(order.id, order);
+    return order;
+  }
+
+  async updateOrder(id: string, updates: Partial<Order>): Promise<Order | undefined> {
+    const order = this.orders.get(id);
+    if (!order) return undefined;
+    
+    const updatedOrder = { ...order, ...updates };
+    this.orders.set(id, updatedOrder);
+    return updatedOrder;
+  }
+
+  // Review methods
+  async getReviews(filters?: { supplierId?: string; vendorId?: string }): Promise<Review[]> {
+    let reviews = Array.from(this.reviews.values());
+    
+    if (filters?.supplierId) {
+      reviews = reviews.filter(r => r.supplierId === filters.supplierId);
+    }
+    
+    if (filters?.vendorId) {
+      reviews = reviews.filter(r => r.vendorId === filters.vendorId);
+    }
+    
+    return reviews;
+  }
+
+  async createReview(insertReview: InsertReview): Promise<Review> {
+    const id = randomUUID();
+    const review: Review = { 
+      ...insertReview, 
+      id,
+      createdAt: new Date(),
+    };
+    this.reviews.set(id, review);
+    return review;
+  }
+
+  // Analytics methods
+  async getDashboardStats(userId: string, role: string): Promise<any> {
+    if (role === "vendor") {
+      const orders = await this.getOrders({ vendorId: userId });
+      const activeOrders = orders.filter(o => ["pending", "confirmed", "processing", "in_transit"].includes(o.status));
+      
+      return {
+        activeOrders: activeOrders.length,
+        nearbySuppliers: 18,
+        avgRating: "4.8",
+        monthlySavings: "₹2,450"
+      };
+    } else if (role === "supplier") {
+      const products = await this.getProducts({ supplierId: userId });
+      const orders = await this.getOrders({ supplierId: userId });
+      
+      return {
+        totalProducts: products.length,
+        activeOrders: orders.filter(o => o.status === "processing").length,
+        monthlyRevenue: "₹45,230",
+        avgRating: "4.7"
+      };
+    }
+    
+    return {};
+  }
+
+  async getPlatformAnalytics(): Promise<any> {
+    const totalVendors = Array.from(this.users.values()).filter(u => u.role === "vendor").length;
+    const activeSuppliers = Array.from(this.suppliers.values()).filter(s => s.isVerified).length;
+    const monthlyOrders = Array.from(this.orders.values()).length;
+    const revenue = Array.from(this.orders.values())
+      .reduce((sum, order) => sum + parseFloat(order.totalAmount || "0"), 0);
+    
+    return {
+      totalVendors,
+      activeSuppliers,
+      monthlyOrders,
+      revenue: `₹${(revenue / 100000).toFixed(1)}M`
+    };
+  }
+}
+
+export const storage = new MemStorage();
